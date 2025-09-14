@@ -302,7 +302,8 @@ void readSensor() {
 - `aRGB_LED_Data_Structure.md` - aRGB LED 資料結構詳解
 - `LA_Testing_Guide.md` - 邏輯分析儀測試指南  
 - `PowerPoint_Content_Guide.md` - PowerPoint 簡報製作指南
-- `project_development_summary.txt` - 完整開發歷程記錄
+- `development_README.md` - 完整開發歷程記錄
+- `Linux_Kernel_Driver_Porting_Guide.md` - Linux kernel driver 移植指南
 
 ### ⚙️ 配置檔案
 - `project_config.json` - 專案配置設定
