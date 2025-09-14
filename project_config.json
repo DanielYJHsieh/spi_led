@@ -1,0 +1,106 @@
+{
+  "name": "SPI aRGB LED Controller",
+  "version": "1.0.0",
+  "description": "Arduino UNO SPI控制aRGB LED專案，基於Everstars虛擬碼實現",
+  "author": "GitHub Copilot",
+  "license": "MIT",
+  "keywords": ["Arduino", "SPI", "LED", "aRGB", "WS2812", "WS2812B"],
+  
+  "hardware": {
+    "platform": "Arduino UNO",
+    "microcontroller": "ATmega328P",
+    "pins": {
+      "data": 11,
+      "power": "5V",
+      "ground": "GND"
+    }
+  },
+  
+  "software": {
+    "arduino_ide": ">=1.8.0",
+    "libraries": [
+      {
+        "name": "SPI",
+        "version": "built-in",
+        "description": "Arduino內建SPI庫"
+      }
+    ]
+  },
+  
+  "led_specifications": {
+    "supported_types": ["WS2812", "WS2812B", "SK6812", "類似協議的aRGB LED"],
+    "voltage": "5V",
+    "protocol": "Single-wire RGB",
+    "data_format": "24-bit (8R + 8G + 8B)",
+    "timing": {
+      "logic_0": "300ns HIGH + 900ns LOW",
+      "logic_1": "900ns HIGH + 300ns LOW",
+      "latch_time": ">50µs LOW"
+    }
+  },
+  
+  "spi_configuration": {
+    "frequency": "3.3MHz",
+    "mode": "SPI_MODE0",
+    "bit_order": "MSBFIRST",
+    "data_encoding": {
+      "logic_0": "0x8 (1000 binary)",
+      "logic_1": "0xE (1110 binary)"
+    }
+  },
+  
+  "project_files": {
+    "main": "spi_argb_led.ino",
+    "examples": "advanced_examples.ino",
+    "documentation": "README.md",
+    "wiring": "wiring_diagram.txt"
+  },
+  
+  "features": [
+    "基於Everstars官方虛擬碼",
+    "支援多LED串聯控制",
+    "內建多種動畫效果",
+    "串列命令控制介面",
+    "可調整LED數量",
+    "HSV到RGB顏色轉換",
+    "穩定的SPI通訊協議"
+  ],
+  
+  "usage_examples": [
+    {
+      "name": "基本控制",
+      "description": "簡單的RGB顏色控制和旋轉效果"
+    },
+    {
+      "name": "進階動畫",
+      "description": "彩虹、呼吸燈、追逐燈等多種效果"
+    },
+    {
+      "name": "互動控制",
+      "description": "通過串列埠實時控制LED顏色"
+    }
+  ],
+  
+  "performance": {
+    "max_leds": "建議不超過50顆 (受Arduino記憶體限制)",
+    "refresh_rate": "可達60Hz",
+    "power_consumption": "每顆LED約60mA@全亮白色"
+  },
+  
+  "troubleshooting": {
+    "common_issues": [
+      {
+        "problem": "LED不亮",
+        "solutions": ["檢查電源連接", "確認數據線", "檢查LED方向"]
+      },
+      {
+        "problem": "顏色錯誤",
+        "solutions": ["確認RGB順序", "檢查SPI設定", "驗證編碼邏輯"]
+      },
+      {
+        "problem": "閃爍不穩定",
+        "solutions": ["添加電阻", "改善電源", "檢查接線"]
+      }
+    ]
+  }
+}
