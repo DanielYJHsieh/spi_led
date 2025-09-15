@@ -21,7 +21,7 @@
 ### 📁 `esp8266_spi_test/` - ESP8266 進階實作
 - **適用平台**: ESP8266 WeMos D1 Mini
 - **SPI 頻率**: 3.33MHz (精確頻率控制)
-- **特色**: 硬體 writeBytes 支援，9顆 LED 控制，三種亮度等級
+- **特色**: 硬體 writeBytes 支援，18顆 LED 控制，UART命令介面
 
 ## 硬體需求
 
@@ -56,7 +56,7 @@
 | D7 (GPIO13) | DIN | 數據輸入線 |
 | 5V | VCC | 電源正極 |
 | GND | GND | 電源負極 |
-| D5 (GPIO14) | - | 未使用 (單線協議) |
+| 任意 USB 轉 TTL | RX/TX | UART命令控制 (115200 bps) |
 
 ```
 Arduino UNO                    aRGB LED Strip
@@ -71,9 +71,9 @@ Arduino UNO                    aRGB LED Strip
 │             │               └─────┘ └─────┘ └─────┘
 └─────────────┘
 
-ESP8266 WeMos D1 Mini          aRGB LED Strip (9 LEDs)
+ESP8266 WeMos D1 Mini          aRGB LED Strip (18 LEDs)
 ┌─────────────┐               ┌─────┐ ┌─────┐     ┌─────┐
-│             │               │LED1 │ │LED2 │ ... │LED9 │
+│             │               │LED1 │ │LED2 │ ... │LED18│
 │   D7────────┼───────────────┤DIN  │ │     │     │     │
 │   (GPIO13)  │               │     │ │     │     │     │
 │             │               │DOUT─┤ │DIN  │ ... │     │
@@ -81,6 +81,7 @@ ESP8266 WeMos D1 Mini          aRGB LED Strip (9 LEDs)
 │             │               │     │ │     │ ... │     │
 │   GND───────┼───────────────┤GND  │ │     │     │     │
 │             │               └─────┘ └─────┘     └─────┘
+│   USB-SERIAL│
 └─────────────┘
 ```
 
@@ -174,9 +175,10 @@ void sendLEDData();
 - 串列監視器會顯示詳細的執行資訊
 
 #### ESP8266 版本
-- 9顆 LED 分三組，每組不同亮度
-- 每秒切換顏色模式：RGB → GBR → BRG → 循環
-- 適合搭配邏輯分析儀進行時序分析
+- 支援18顆 LED，預設全白燈
+- 通過UART命令控制每個LED的顏色
+- 提供多種控制命令：設置、狀態、重置等
+- 適合實際WS2812B LED燈條控制應用
 
 ### 4. 自訂設定
 
@@ -198,6 +200,19 @@ void setup() {
 
 #### ESP8266 版本
 修改 LED 數量：
+```cpp
+// 在程式開頭修改常數
+const uint8_t NUM_LEDS = 30;  // 改為 30 顆 LED
+```
+
+控制LED顏色：
+```
+# 透過Serial Monitor發送以下命令
+0,255,0,0     # 將第1顆LED設為紅色
+1,0,255,0     # 將第2顆LED設為綠色
+reset         # 所有LED重設為白色
+status        # 檢視所有LED狀態
+```
 ```cpp
 #define NUM_LEDS 12  // 改為 12 顆 LED
 ```

@@ -31,214 +31,171 @@
 // 常用頻率: 1M, 2M, 4M, 8M, 10M, 20M, 40MHz
 const uint32_t SPI_FREQUENCY = 3333333;  // 3.33MHz (精確頻率，ESP8266支援)
 
+// LED 設定
+const uint8_t NUM_LEDS = 18;  // 增加到18顆LED
+
+// 全局變數用於儲存所有LED的RGB數據
+uint8_t ledData[NUM_LEDS][3]; // [LED序號][R=0, G=1, B=2]
+
+// 用於UART通信的緩衝區
+const int MAX_INPUT_LENGTH = 20;
+char inputBuffer[MAX_INPUT_LENGTH];
+int bufferPosition = 0;
+
 void setup() {
-  // === 串列通訊可能影響SPI時鐘穩定性 ===
-  // Serial.begin(115200);  // 串列初始化可能影響時鐘
-  // Serial.println("WeMos D1 Mini (ESP8266) SPI測試程式");
-  // Serial.println("測試SPI基本傳輸功能");
+  // 啟用串列通訊用於UART輸入
+  Serial.begin(115200);
   
-  // 禁用中斷以獲得最穩定的SPI時鐘
-  // noInterrupts();  // 可選：完全禁用中斷
+  Serial.println("WeMos D1 Mini (ESP8266) SPI LED控制程式");
+  Serial.println("輸入格式: LED,R,G,B (例如: 0,255,255,255)");
+  Serial.println("LED範圍: 0-17, RGB範圍: 0-255");
   
   // 初始化SPI
   SPI.begin();
   
-  // === 註解掉可能造成時鐘干擾的串列輸出 ===
-  // Serial.println("SPI初始化完成");
-  // Serial.println("MOSI: D7 (GPIO13), SCK: D5 (GPIO14)");
-  // Serial.println("SPI頻率: 3.33MHz (ESP8266精確支援)");
-  // Serial.println("LA設定: CH0=MOSI, CH1=SCK");
-  // Serial.println("注意: 標準SPI中MOSI空閒時為高電平");
-  // Serial.println();
+  // 初始化所有LED為白色 (R=255, G=255, B=255)
+  for (int i = 0; i < NUM_LEDS; i++) {
+    ledData[i][0] = 0xFF; // R
+    ledData[i][1] = 0xFF; // G
+    ledData[i][2] = 0xFF; // B
+  }
+  
+  // 初始顯示所有LED
+  updateLEDs();
 }
 
 void loop() {
-  static unsigned long lastTransmission = 0;
-  static int transmissionStep = 0;
-  
-  unsigned long currentTime = millis();
-  
-  // 每5秒重新開始整個循環
-  if (currentTime - lastTransmission >= 5000) {
-    transmissionStep = 0;
-    lastTransmission = currentTime;
-  }
-  
-  // 根據步驟進行不同的傳輸，每1秒一次
-  if (transmissionStep == 0 || 
-      (transmissionStep > 0 && currentTime - lastTransmission >= transmissionStep * 1000)) {
+  // 檢查是否有新的UART輸入
+  while (Serial.available() > 0) {
+    char inChar = Serial.read();
     
-    // 開始SPI傳輸
-    SPI.beginTransaction(SPISettings(SPI_FREQUENCY, MSBFIRST, SPI_MODE0));
-    
-    if (transmissionStep == 0) {
-      // 第一次傳輸: 9顆LED - RGBRGBRGB (三種亮度: 0xFF/0x3F/0x0F)
-      uint8_t data1[] = {
-        // LED 1: Red (0xFF/0x00/0x00) - 最高亮度
-        0xEE, 0xEE, 0xEE, 0xEE,  // Red: 0xFF -> EEEEEEEE
-        0x88, 0x88, 0x88, 0x88,  // Green: 0x00 -> 88888888
-        0x88, 0x88, 0x88, 0x88,  // Blue: 0x00 -> 88888888
-        // LED 2: Green (0x00/0xFF/0x00) - 最高亮度
-        0x88, 0x88, 0x88, 0x88,  // Red: 0x00 -> 88888888
-        0xEE, 0xEE, 0xEE, 0xEE,  // Green: 0xFF -> EEEEEEEE
-        0x88, 0x88, 0x88, 0x88,  // Blue: 0x00 -> 88888888
-        // LED 3: Blue (0x00/0x00/0xFF) - 最高亮度
-        0x88, 0x88, 0x88, 0x88,  // Red: 0x00 -> 88888888
-        0x88, 0x88, 0x88, 0x88,  // Green: 0x00 -> 88888888
-        0xEE, 0xEE, 0xEE, 0xEE,  // Blue: 0xFF -> EEEEEEEE
-        // LED 4: Red (0x3F/0x00/0x00) - 中等亮度
-        0x88, 0xE8, 0xEE, 0xEE,  // Red: 0x3F -> 88E8EEEE
-        0x88, 0x88, 0x88, 0x88,  // Green: 0x00 -> 88888888
-        0x88, 0x88, 0x88, 0x88,  // Blue: 0x00 -> 88888888
-        // LED 5: Green (0x00/0x3F/0x00) - 中等亮度
-        0x88, 0x88, 0x88, 0x88,  // Red: 0x00 -> 88888888
-        0x88, 0xE8, 0xEE, 0xEE,  // Green: 0x3F -> 88E8EEEE
-        0x88, 0x88, 0x88, 0x88,  // Blue: 0x00 -> 88888888
-        // LED 6: Blue (0x00/0x00/0x3F) - 中等亮度
-        0x88, 0x88, 0x88, 0x88,  // Red: 0x00 -> 88888888
-        0x88, 0x88, 0x88, 0x88,  // Green: 0x00 -> 88888888
-        0x88, 0xE8, 0xEE, 0xEE,  // Blue: 0x3F -> 88E8EEEE
-        // LED 7: Red (0x0F/0x00/0x00) - 最低亮度
-        0x88, 0x88, 0x8E, 0xEE,  // Red: 0x0F -> 88888EEE
-        0x88, 0x88, 0x88, 0x88,  // Green: 0x00 -> 88888888
-        0x88, 0x88, 0x88, 0x88,  // Blue: 0x00 -> 88888888
-        // LED 8: Green (0x00/0x0F/0x00) - 最低亮度
-        0x88, 0x88, 0x88, 0x88,  // Red: 0x00 -> 88888888
-        0x88, 0x88, 0x8E, 0xEE,  // Green: 0x0F -> 88888EEE
-        0x88, 0x88, 0x88, 0x88,  // Blue: 0x00 -> 88888888
-        // LED 9: Blue (0x00/0x00/0x0F) - 最低亮度
-        0x88, 0x88, 0x88, 0x88,  // Red: 0x00 -> 88888888
-        0x88, 0x88, 0x88, 0x88,  // Green: 0x00 -> 88888888
-        0x88, 0x88, 0x8E, 0xEE   // Blue: 0x0F -> 88888EEE
-      };
-      SPI.writeBytes(data1, 108);  // 9 LEDs × 12 bytes = 108 bytes
-      
-    } else if (transmissionStep == 1) {
-      // 第二次傳輸: 9顆LED - GBRGBRGBR (三種亮度: 0xFF/0x3F/0x0F)
-      uint8_t data2[] = {
-        // LED 1: Green (0x00/0xFF/0x00) - 最高亮度
-        0x88, 0x88, 0x88, 0x88,  // Red: 0x00 -> 88888888
-        0xEE, 0xEE, 0xEE, 0xEE,  // Green: 0xFF -> EEEEEEEE
-        0x88, 0x88, 0x88, 0x88,  // Blue: 0x00 -> 88888888
-        // LED 2: Blue (0x00/0x00/0xFF) - 最高亮度
-        0x88, 0x88, 0x88, 0x88,  // Red: 0x00 -> 88888888
-        0x88, 0x88, 0x88, 0x88,  // Green: 0x00 -> 88888888
-        0xEE, 0xEE, 0xEE, 0xEE,  // Blue: 0xFF -> EEEEEEEE
-        // LED 3: Red (0xFF/0x00/0x00) - 最高亮度
-        0xEE, 0xEE, 0xEE, 0xEE,  // Red: 0xFF -> EEEEEEEE
-        0x88, 0x88, 0x88, 0x88,  // Green: 0x00 -> 88888888
-        0x88, 0x88, 0x88, 0x88,  // Blue: 0x00 -> 88888888
-        // LED 4: Green (0x00/0x3F/0x00) - 中等亮度
-        0x88, 0x88, 0x88, 0x88,  // Red: 0x00 -> 88888888
-        0x88, 0xE8, 0xEE, 0xEE,  // Green: 0x3F -> 88E8EEEE
-        0x88, 0x88, 0x88, 0x88,  // Blue: 0x00 -> 88888888
-        // LED 5: Blue (0x00/0x00/0x3F) - 中等亮度
-        0x88, 0x88, 0x88, 0x88,  // Red: 0x00 -> 88888888
-        0x88, 0x88, 0x88, 0x88,  // Green: 0x00 -> 88888888
-        0x88, 0xE8, 0xEE, 0xEE,  // Blue: 0x3F -> 88E8EEEE
-        // LED 6: Red (0x3F/0x00/0x00) - 中等亮度
-        0x88, 0xE8, 0xEE, 0xEE,  // Red: 0x3F -> 88E8EEEE
-        0x88, 0x88, 0x88, 0x88,  // Green: 0x00 -> 88888888
-        0x88, 0x88, 0x88, 0x88,  // Blue: 0x00 -> 88888888
-        // LED 7: Green (0x00/0x0F/0x00) - 最低亮度
-        0x88, 0x88, 0x88, 0x88,  // Red: 0x00 -> 88888888
-        0x88, 0x88, 0x8E, 0xEE,  // Green: 0x0F -> 88888EEE
-        0x88, 0x88, 0x88, 0x88,  // Blue: 0x00 -> 88888888
-        // LED 8: Blue (0x00/0x00/0x0F) - 最低亮度
-        0x88, 0x88, 0x88, 0x88,  // Red: 0x00 -> 88888888
-        0x88, 0x88, 0x88, 0x88,  // Green: 0x00 -> 88888888
-        0x88, 0x88, 0x8E, 0xEE,  // Blue: 0x0F -> 88888EEE
-        // LED 9: Red (0x0F/0x00/0x00) - 最低亮度
-        0x88, 0x88, 0x8E, 0xEE,  // Red: 0x0F -> 88888EEE
-        0x88, 0x88, 0x88, 0x88,  // Green: 0x00 -> 88888888
-        0x88, 0x88, 0x88, 0x88   // Blue: 0x00 -> 88888888
-      };
-      SPI.writeBytes(data2, 108);  // 9 LEDs × 12 bytes = 108 bytes
-      
-    } else if (transmissionStep == 2) {
-      // 第三次傳輸: 9顆LED - BRGBRGBRG (三種亮度: 0xFF/0x3F/0x0F)
-      uint8_t data3[] = {
-        // LED 1: Blue (0x00/0x00/0xFF) - 最高亮度
-        0x88, 0x88, 0x88, 0x88,  // Red: 0x00 -> 88888888
-        0x88, 0x88, 0x88, 0x88,  // Green: 0x00 -> 88888888
-        0xEE, 0xEE, 0xEE, 0xEE,  // Blue: 0xFF -> EEEEEEEE
-        // LED 2: Red (0xFF/0x00/0x00) - 最高亮度
-        0xEE, 0xEE, 0xEE, 0xEE,  // Red: 0xFF -> EEEEEEEE
-        0x88, 0x88, 0x88, 0x88,  // Green: 0x00 -> 88888888
-        0x88, 0x88, 0x88, 0x88,  // Blue: 0x00 -> 88888888
-        // LED 3: Green (0x00/0xFF/0x00) - 最高亮度
-        0x88, 0x88, 0x88, 0x88,  // Red: 0x00 -> 88888888
-        0xEE, 0xEE, 0xEE, 0xEE,  // Green: 0xFF -> EEEEEEEE
-        0x88, 0x88, 0x88, 0x88,  // Blue: 0x00 -> 88888888
-        // LED 4: Blue (0x00/0x00/0x3F) - 中等亮度
-        0x88, 0x88, 0x88, 0x88,  // Red: 0x00 -> 88888888
-        0x88, 0x88, 0x88, 0x88,  // Green: 0x00 -> 88888888
-        0x88, 0xE8, 0xEE, 0xEE,  // Blue: 0x3F -> 88E8EEEE
-        // LED 5: Red (0x3F/0x00/0x00) - 中等亮度
-        0x88, 0xE8, 0xEE, 0xEE,  // Red: 0x3F -> 88E8EEEE
-        0x88, 0x88, 0x88, 0x88,  // Green: 0x00 -> 88888888
-        0x88, 0x88, 0x88, 0x88,  // Blue: 0x00 -> 88888888
-        // LED 6: Green (0x00/0x3F/0x00) - 中等亮度
-        0x88, 0x88, 0x88, 0x88,  // Red: 0x00 -> 88888888
-        0x88, 0xE8, 0xEE, 0xEE,  // Green: 0x3F -> 88E8EEEE
-        0x88, 0x88, 0x88, 0x88,  // Blue: 0x00 -> 88888888
-        // LED 7: Blue (0x00/0x00/0x0F) - 最低亮度
-        0x88, 0x88, 0x88, 0x88,  // Red: 0x00 -> 88888888
-        0x88, 0x88, 0x88, 0x88,  // Green: 0x00 -> 88888888
-        0x88, 0x88, 0x8E, 0xEE,  // Blue: 0x0F -> 88888EEE
-        // LED 8: Red (0x0F/0x00/0x00) - 最低亮度
-        0x88, 0x88, 0x8E, 0xEE,  // Red: 0x0F -> 88888EEE
-        0x88, 0x88, 0x88, 0x88,  // Green: 0x00 -> 88888888
-        0x88, 0x88, 0x88, 0x88,  // Blue: 0x00 -> 88888888
-        // LED 9: Green (0x00/0x0F/0x00) - 最低亮度
-        0x88, 0x88, 0x88, 0x88,  // Red: 0x00 -> 88888888
-        0x88, 0x88, 0x8E, 0xEE,  // Green: 0x0F -> 88888EEE
-        0x88, 0x88, 0x88, 0x88   // Blue: 0x00 -> 88888888
-      };
-      SPI.writeBytes(data3, 108);  // 9 LEDs × 12 bytes = 108 bytes
-    }
-    
-    // 結束SPI傳輸
-    SPI.endTransaction();
-    
-    transmissionStep++;
-    if (transmissionStep > 2) {
-      transmissionStep = 3; // 保持在最後狀態直到5秒重置
+    // 處理回車符或換行符，兩者都視為命令結束
+    if (inChar == '\n' || inChar == '\r') {
+      if (bufferPosition > 0) {  // 確保不處理空命令
+        inputBuffer[bufferPosition] = '\0'; // 字符串結尾
+        Serial.print("處理命令: ");
+        Serial.println(inputBuffer);
+        processCommand();
+        bufferPosition = 0; // 重置緩衝區位置
+      }
+    } 
+    // 添加字符到緩衝區 (避免溢出)
+    else if (bufferPosition < MAX_INPUT_LENGTH - 1) {
+      inputBuffer[bufferPosition++] = inChar;
     }
   }
 }
 
-/*
- * 額外測試函數 - 可以手動調用
- */
-void sendCustomData(uint8_t data) {
-  SPI.beginTransaction(SPISettings(SPI_FREQUENCY, MSBFIRST, SPI_MODE0));
-  SPI.transfer(data);
-  SPI.endTransaction();
+// 處理接收到的命令
+void processCommand() {
+  int led, r, g, b;
   
-  Serial.print("發送自定義數據: 0x");
-  Serial.print(data, HEX);
-  Serial.print(" (");
-  Serial.print(data, BIN);
-  Serial.println(")");
-}
-
-/*
- * 連續發送多個相同數據
- */
-void sendRepeatedData(uint8_t data, int count) {
-  SPI.beginTransaction(SPISettings(SPI_FREQUENCY, MSBFIRST, SPI_MODE0));
-  
-  for (int i = 0; i < count; i++) {
-    SPI.transfer(data);
+  // 處理特殊命令
+  if (strcmp(inputBuffer, "test") == 0) {
+    Serial.println("OK");
+    return;
+  }
+  else if (strcmp(inputBuffer, "status") == 0) {
+    // 輸出當前所有LED的狀態
+    Serial.println("當前LED狀態:");
+    for (int i = 0; i < NUM_LEDS; i++) {
+      Serial.print(i);
+      Serial.print(":");
+      Serial.print(ledData[i][0]);
+      Serial.print(",");
+      Serial.print(ledData[i][1]);
+      Serial.print(",");
+      Serial.print(ledData[i][2]);
+      Serial.print(" ");
+      
+      // 每4個LED換行顯示
+      if ((i+1) % 4 == 0) {
+        Serial.println();
+      }
+    }
+    Serial.println();
+    return;
+  }
+  else if (strcmp(inputBuffer, "help") == 0) {
+    Serial.println("Commands: LED,R,G,B | test | status | reset");
+    return;
+  }
+  else if (strcmp(inputBuffer, "reset") == 0) {
+    // 重設所有LED為白色
+    for (int i = 0; i < NUM_LEDS; i++) {
+      ledData[i][0] = 0xFF; // R
+      ledData[i][1] = 0xFF; // G
+      ledData[i][2] = 0xFF; // B
+    }
+    updateLEDs();
+    Serial.println("OK");
+    return;
   }
   
+  // 解析常規命令格式: LED,R,G,B
+  int parsed = sscanf(inputBuffer, "%d,%d,%d,%d", &led, &r, &g, &b);
+  
+  if (parsed == 4) {
+    // 檢查值的有效範圍
+    if (led >= 0 && led < NUM_LEDS && 
+        r >= 0 && r <= 255 && 
+        g >= 0 && g <= 255 && 
+        b >= 0 && b <= 255) {
+      
+      // 更新LED數據
+      ledData[led][0] = r;
+      ledData[led][1] = g;
+      ledData[led][2] = b;
+      
+      // 輸出確認信息
+      Serial.print("設置LED ");
+      Serial.print(led);
+      Serial.print(" 為 RGB(");
+      Serial.print(r);
+      Serial.print(",");
+      Serial.print(g);
+      Serial.print(",");
+      Serial.print(b);
+      Serial.println(")");
+      
+      // 更新所有LED顯示
+      updateLEDs();
+    } else {
+      Serial.println("ERR: 參數超出範圍");
+    }
+  } else {
+    Serial.println("ERR: 格式不正確");
+  }
+}
+
+// 更新所有LED顯示
+void updateLEDs() {
+  // 計算所需的緩衝區大小 (每個LED的每個顏色通道需要4個字節)
+  const int bufferSize = NUM_LEDS * 3 * 4; // 18 LEDs * 3 channels * 4 bytes
+  uint8_t dataBuffer[bufferSize];
+  
+  int bufferIndex = 0;
+  
+  // 為每個LED生成數據
+  for (int i = 0; i < NUM_LEDS; i++) {
+    // 為每個LED處理RGB三個通道
+    for (int color = 0; color < 3; color++) {
+      uint32_t encoded = convertTo32bit(ledData[i][color]);
+      
+      // 將32位編碼拆分為4個字節
+      dataBuffer[bufferIndex++] = (encoded >> 24) & 0xFF;
+      dataBuffer[bufferIndex++] = (encoded >> 16) & 0xFF;
+      dataBuffer[bufferIndex++] = (encoded >> 8) & 0xFF;
+      dataBuffer[bufferIndex++] = encoded & 0xFF;
+    }
+  }
+  
+  // 開始SPI傳輸
+  SPI.beginTransaction(SPISettings(SPI_FREQUENCY, MSBFIRST, SPI_MODE0));
+  SPI.writeBytes(dataBuffer, bufferSize);
   SPI.endTransaction();
   
-  Serial.print("重複發送 ");
-  Serial.print(count);
-  Serial.print(" 次數據: 0x");
-  Serial.println(data, HEX);
+  Serial.println("LED顯示已更新");
 }
 
 /*
@@ -280,7 +237,7 @@ void send32bitData(uint32_t data) {
 }
 
 /*
- * 發送8位數據並轉換為32位編碼 (新增功能)
+ * 發送8位數據並轉換為32位編碼
  */
 void send8bitAsEncoded(uint8_t data) {
   uint32_t encoded = convertTo32bit(data);
